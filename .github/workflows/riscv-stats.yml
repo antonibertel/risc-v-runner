@@ -1,0 +1,65 @@
+name: RISC-V Machine Stats
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  print-stats:
+    runs-on: ubuntu-24.04-riscv
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: System Information
+        run: |
+          echo "### OS Information"
+          uname -a
+          cat /etc/os-release
+          
+          echo -e "\n### CPU Information"
+          lscpu
+          nproc
+          cat /proc/cpuinfo
+          
+          echo -e "\n### Memory Information"
+          free -h
+          cat /proc/meminfo
+          
+          echo -e "\n### Storage Information"
+          df -h
+          lsblk
+          
+          echo -e "\n### Hardware Devices"
+          ls /dev
+
+      - name: Kubernetes Information
+        run: |
+          echo "### Kubernetes Environment Variables"
+          env | grep -i KUBERNETES || echo "No Kubernetes environment variables found."
+          
+          echo -e "\n### Service Account Information"
+          if [ -d /run/secrets/kubernetes.io/serviceaccount ]; then
+            ls -la /run/secrets/kubernetes.io/serviceaccount
+            echo "Service account token exists."
+          else
+            echo "No service account directory found."
+          fi
+          
+          echo -e "\n### Container & Cgroup Info"
+          cat /proc/self/cgroup | head -n 5
+          cat /proc/self/mountinfo | grep -i kubernetes || echo "No k8s mounts found in mountinfo."
+          
+          echo -e "\n### Network Configuration"
+          cat /etc/resolv.conf
+          ip addr
+          
+          echo -e "\n### Kubectl Information (if available)"
+          if command -v kubectl >/dev/null 2>&1; then
+            kubectl version --client
+            kubectl cluster-info || echo "Could not get cluster info (unauthorized or no cluster)."
+            kubectl get pods || echo "Could not get pods (unauthorized or no cluster)."
+          else
+            echo "kubectl not found."
+          fi
