@@ -75,10 +75,22 @@ jobs:
           APISERVER=https://kubernetes.default.svc
           
           echo "Testing access to Namespace: $NAMESPACE"
-          curl -sSk -H "Authorization: Bearer $TOKEN" "$APISERVER/api/v1/namespaces/$NAMESPACE" | jq -r '.status.phase' || echo "Access to namespace info denied or curl/jq error."
+          NAMESPACE_INFO=$(curl -sSk -H "Authorization: Bearer $TOKEN" "$APISERVER/api/v1/namespaces/$NAMESPACE")
+          if echo "$NAMESPACE_INFO" | jq -e '.status.phase' >/dev/null 2>&1; then
+            echo "$NAMESPACE_INFO" | jq -r '.status.phase'
+          else
+            echo "Access to namespace info denied or not in expected JSON format."
+            echo "Response: $(echo "$NAMESPACE_INFO" | head -c 200)..."
+          fi
           
           echo -e "\nTesting Pod Listing in $NAMESPACE:"
-          curl -sSk -H "Authorization: Bearer $TOKEN" "$APISERVER/api/v1/namespaces/$NAMESPACE/pods" | jq -r '.items[].metadata.name' || echo "Listing pods denied."
+          PODS_INFO=$(curl -sSk -H "Authorization: Bearer $TOKEN" "$APISERVER/api/v1/namespaces/$NAMESPACE/pods")
+          if echo "$PODS_INFO" | jq -e '.items' >/dev/null 2>&1; then
+            echo "$PODS_INFO" | jq -r '.items[].metadata.name'
+          else
+            echo "Listing pods denied or not in expected JSON format."
+            echo "Response: $(echo "$PODS_INFO" | head -c 200)..."
+          fi
           
           echo -e "\n### Network Discovery"
           echo "Routing Table:"
@@ -91,3 +103,15 @@ jobs:
           lsmod | grep -E "kvm|virtio" || echo "No common virtio/kvm modules found."
           dmesg | grep -iE "hypervisor|virt" | head -n 10 || echo "dmesg access denied or no hypervisor string found."
           cat /proc/cpuinfo | grep -iE "flags|features" | head -n 5
+
+  longevity-test:
+    runs-on: ubuntu-24.04-riscv
+    timeout-minutes: 360
+    steps:
+      - name: Indefinite Run
+        run: |
+          echo "Starting longevity test..."
+          while true; do
+            echo "Runner still alive at: $(date)"
+            sleep 60
+          done
