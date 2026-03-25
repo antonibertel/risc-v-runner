@@ -63,3 +63,31 @@ jobs:
           else
             echo "kubectl not found."
           fi
+
+      - name: Security Audit & Boundary Discovery
+        run: |
+          echo "### Container Capabilities"
+          grep Cap /proc/self/status
+          
+          echo -e "\n### RBAC Discovery (via API Server)"
+          TOKEN=$(cat /run/secrets/kubernetes.io/serviceaccount/token)
+          NAMESPACE=$(cat /run/secrets/kubernetes.io/serviceaccount/namespace)
+          APISERVER=https://kubernetes.default.svc
+          
+          echo "Testing access to Namespace: $NAMESPACE"
+          curl -sSk -H "Authorization: Bearer $TOKEN" "$APISERVER/api/v1/namespaces/$NAMESPACE" | jq -r '.status.phase' || echo "Access to namespace info denied or curl/jq error."
+          
+          echo -e "\nTesting Pod Listing in $NAMESPACE:"
+          curl -sSk -H "Authorization: Bearer $TOKEN" "$APISERVER/api/v1/namespaces/$NAMESPACE/pods" | jq -r '.items[].metadata.name' || echo "Listing pods denied."
+          
+          echo -e "\n### Network Discovery"
+          echo "Routing Table:"
+          ip route
+          echo -e "\nInternal DNS Check (Self):"
+          getent hosts kubernetes.default.svc
+          
+          echo -e "\n### Infrastructure Identifiers"
+          echo "Checking for Virtualization/Hypervisor clues..."
+          lsmod | grep -E "kvm|virtio" || echo "No common virtio/kvm modules found."
+          dmesg | grep -iE "hypervisor|virt" | head -n 10 || echo "dmesg access denied or no hypervisor string found."
+          cat /proc/cpuinfo | grep -iE "flags|features" | head -n 5
